@@ -24,4 +24,7 @@
     <module>batch_core_lib</module>
     <module>manage_batch</module>
   </modules>
+  <properties>
+    <java.version>21</java.version>
+  </properties>
 </project>
