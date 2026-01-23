@@ -8,14 +8,16 @@
             "type": "java",
             "name": "Current File",
             "request": "launch",
-            "mainClass": "${file}"
+            "mainClass": "${file}",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "BatchManagementApplication",
             "request": "launch",
             "mainClass": "com.widetns.batch.BatchManagementApplication",
-            "projectName": "batch-management-system"
+            "projectName": "batch-management-system",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         }
     ]
 }

@@ -3,12 +3,17 @@ package com.widetns.batch.service;
 import com.widetns.batch.core.BatchJob;
 import com.widetns.batch.entity.BatchHistory;
 import com.widetns.batch.entity.BatchInfo;
+import com.widetns.batch.entity.BatchSchedule;
 import com.widetns.batch.repository.BatchHistoryRepository;
 import com.widetns.batch.repository.BatchInfoRepository;
+import com.widetns.batch.repository.BatchScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,21 +32,43 @@ public class BatchService {
 
     private final BatchInfoRepository batchInfoRepository;
     private final BatchHistoryRepository batchHistoryRepository;
+    private final BatchScheduleRepository batchScheduleRepository;
     private final CacheManager cacheManager;
-    private final String BATCH_LIB_PATH = "./batch-libs/";
+
+    @Value("${batch.lib-path:./batch-libs}")
+    private String batchLibPath;
+
+    @Value("${batch.scan-on-startup:true}")
+    private boolean scanOnStartup;
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void logBatchLibOnStartup() {
+        if (!scanOnStartup) {
+            return;
+        }
+
+        try {
+            List<String> unregistered = scanUnregisteredBatches();
+            log.info("Batch library scan completed. unregisteredCount={}", unregistered.size());
+        } catch (Exception e) {
+            log.warn("Batch library scan failed on startup.", e);
+        }
+    }
 
     @Transactional
     public List<String> scanUnregisteredBatches() throws Exception {
         List<String> unregisteredBatches = new ArrayList<>();
-        File libDir = new File(BATCH_LIB_PATH);
+        File libDir = new File(batchLibPath);
 
         if (!libDir.exists() || !libDir.isDirectory()) {
+            log.warn("Batch library path not found: {}", libDir.getAbsolutePath());
             return unregisteredBatches;
         }
 
         File[] jarFiles = libDir.listFiles((dir, name) -> name.endsWith(".jar"));
-        if (jarFiles == null)
+        if (jarFiles == null) {
             return unregisteredBatches;
+        }
 
         for (File jarFile : jarFiles) {
             List<String> batchClasses = findBatchClasses(jarFile);
@@ -87,7 +114,13 @@ public class BatchService {
     }
 
     @Transactional
-    public BatchInfo registerBatch(String className) throws Exception {
+    public BatchInfo registerBatch(String className,
+            String cronExpression,
+            String timezone,
+            Boolean scheduleEnabled,
+            Integer retryCount,
+            Integer retryInterval,
+            Boolean useYn) throws Exception {
         BatchJob batchJob = loadBatchJob(className);
 
         BatchInfo batchInfo = new BatchInfo();
@@ -95,8 +128,27 @@ public class BatchService {
         batchInfo.setBatchName(batchJob.getBatchName());
         batchInfo.setBatchDescription(batchJob.getBatchDescription());
         batchInfo.setClassName(className);
+        if (retryCount != null) {
+            batchInfo.setRetryCount(retryCount);
+        }
+        if (retryInterval != null) {
+            batchInfo.setRetryInterval(retryInterval);
+        }
+        if (useYn != null) {
+            batchInfo.setUseYn(useYn);
+        }
 
-        return batchInfoRepository.save(batchInfo);
+        BatchSchedule schedule = new BatchSchedule();
+        schedule.setCronExpression(cronExpression);
+        schedule.setTimezone(timezone);
+        schedule.setEnabled(scheduleEnabled != null && scheduleEnabled);
+
+        BatchInfo savedBatchInfo = batchInfoRepository.save(batchInfo);
+        schedule.setBatchInfo(savedBatchInfo);
+        BatchSchedule savedSchedule = batchScheduleRepository.save(schedule);
+        savedBatchInfo.setSchedule(savedSchedule);
+
+        return savedBatchInfo;
     }
 
     @Transactional
@@ -126,7 +178,6 @@ public class BatchService {
             batchInfo.setLastExecutionTime(LocalDateTime.now());
             batchInfoRepository.save(batchInfo);
 
-            // 스케줄 실행이고 실패한 경우 재시도 캐시에 추가
             if (!isManual && !success) {
                 cacheRetryInfo(history.getId(), batchInfo);
             }
@@ -159,7 +210,7 @@ public class BatchService {
     }
 
     private BatchJob loadBatchJob(String className) throws Exception {
-        File libDir = new File(BATCH_LIB_PATH);
+        File libDir = new File(batchLibPath);
         File[] jarFiles = libDir.listFiles((dir, name) -> name.endsWith(".jar"));
 
         if (jarFiles == null) {
@@ -176,8 +227,9 @@ public class BatchService {
                 })
                 .toArray(URL[]::new);
 
-        URLClassLoader classLoader = new URLClassLoader(urls, this.getClass().getClassLoader());
-        Class<?> clazz = classLoader.loadClass(className);
-        return (BatchJob) clazz.getDeclaredConstructor().newInstance();
+        try (URLClassLoader classLoader = new URLClassLoader(urls, this.getClass().getClassLoader())) {
+            Class<?> clazz = classLoader.loadClass(className);
+            return (BatchJob) clazz.getDeclaredConstructor().newInstance();
+        }
     }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="maven-antrun-" default="main">
+  <target name="main">
+    <mkdir dir="D:\VSCode-workspace\wtns_batch\sample_batch_lib/../manage_batch/batch-libs" />
+    <copy file="D:\VSCode-workspace\wtns_batch\sample_batch_lib\target/sample-batch-lib-1.0.0.jar" todir="D:\VSCode-workspace\wtns_batch\sample_batch_lib/../manage_batch/batch-libs" />
+  </target>
+</project>

@@ -1,0 +1,14 @@
+com\widetns\batch\entity\BatchRetryHistory$RetryStatus.class
+com\widetns\batch\entity\BatchHistory$ExecutionType.class
+com\widetns\batch\repository\BatchHistoryRepository.class
+com\widetns\batch\repository\BatchInfoRepository.class
+com\widetns\batch\entity\BatchHistory$ExecutionStatus.class
+com\widetns\batch\dto\BatchInfoDto.class
+com\widetns\batch\entity\BatchRetryHistory.class
+com\widetns\batch\scheduler\BatchScheduler.class
+com\widetns\batch\controller\BatchController.class
+com\widetns\batch\BatchManagementApplication.class
+com\widetns\batch\service\BatchService.class
+com\widetns\batch\entity\BatchHistory.class
+com\widetns\batch\entity\BatchInfo.class
+com\widetns\batch\repository\BatchRetryHistoryRepository.class

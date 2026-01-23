@@ -9,6 +9,8 @@ public class BatchInfoDto {
     private String batchName;
     private String batchDescription;
     private String cronExpression;
+    private String timezone;
+    private Boolean scheduleEnabled;
     private Integer retryCount;
     private Integer retryInterval;
     private Boolean useYn;

@@ -1,8 +1,10 @@
 package com.widetns.batch.controller;
 
 import com.widetns.batch.dto.BatchInfoDto;
+import com.widetns.batch.dto.RegisterBatchRequest;
 import com.widetns.batch.entity.BatchHistory;
 import com.widetns.batch.entity.BatchInfo;
+import com.widetns.batch.entity.BatchSchedule;
 import com.widetns.batch.repository.BatchHistoryRepository;
 import com.widetns.batch.repository.BatchInfoRepository;
 import com.widetns.batch.service.BatchService;
@@ -15,6 +17,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.time.ZoneId;
 
 @Controller
 @RequestMapping("/batch")
@@ -45,9 +49,19 @@ public class BatchController {
 
     @PostMapping("/register")
     @ResponseBody
-    public ResponseEntity<BatchInfo> registerBatch(@RequestBody String className) {
+    public ResponseEntity<BatchInfo> registerBatch(@RequestBody RegisterBatchRequest request) {
         try {
-            BatchInfo batchInfo = batchService.registerBatch(className);
+            if (request.getClassName() == null || request.getClassName().isBlank()) {
+                return ResponseEntity.badRequest().build();
+            }
+            BatchInfo batchInfo = batchService.registerBatch(
+                    request.getClassName(),
+                    request.getCronExpression(),
+                    request.getTimezone(),
+                    request.getScheduleEnabled(),
+                    request.getRetryCount(),
+                    request.getRetryInterval(),
+                    request.getUseYn());
             return ResponseEntity.ok(batchInfo);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
@@ -75,10 +89,21 @@ public class BatchController {
 
         batchInfo.setBatchName(dto.getBatchName());
         batchInfo.setBatchDescription(dto.getBatchDescription());
-        batchInfo.setCronExpression(dto.getCronExpression());
         batchInfo.setRetryCount(dto.getRetryCount());
         batchInfo.setRetryInterval(dto.getRetryInterval());
         batchInfo.setUseYn(dto.getUseYn());
+
+        BatchSchedule schedule = batchInfo.getSchedule();
+        if (schedule == null) {
+            schedule = new BatchSchedule();
+            schedule.setBatchInfo(batchInfo);
+            batchInfo.setSchedule(schedule);
+        }
+        schedule.setCronExpression(dto.getCronExpression());
+        schedule.setTimezone(dto.getTimezone());
+        if (dto.getScheduleEnabled() != null) {
+            schedule.setEnabled(dto.getScheduleEnabled());
+        }
 
         return ResponseEntity.ok(batchInfoRepository.save(batchInfo));
     }
@@ -96,5 +121,13 @@ public class BatchController {
                 .orElseThrow(() -> new RuntimeException("이력을 찾을 수 없습니다."));
         model.addAttribute("history", history);
         return "batch/history-detail";
+    }
+
+    @GetMapping("/timezones")
+    @ResponseBody
+    public List<String> listTimezones() {
+        return ZoneId.getAvailableZoneIds().stream()
+                .sorted()
+                .collect(Collectors.toList());
     }
 }

@@ -3,9 +3,11 @@ package com.widetns.batch.scheduler;
 import com.widetns.batch.entity.BatchHistory;
 import com.widetns.batch.entity.BatchInfo;
 import com.widetns.batch.entity.BatchRetryHistory;
+import com.widetns.batch.entity.BatchSchedule;
 import com.widetns.batch.repository.BatchHistoryRepository;
 import com.widetns.batch.repository.BatchInfoRepository;
 import com.widetns.batch.repository.BatchRetryHistoryRepository;
+import com.widetns.batch.repository.BatchScheduleRepository;
 import com.widetns.batch.service.BatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,8 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -27,28 +31,41 @@ public class BatchScheduler {
     private final BatchInfoRepository batchInfoRepository;
     private final BatchHistoryRepository batchHistoryRepository;
     private final BatchRetryHistoryRepository retryHistoryRepository;
+    private final BatchScheduleRepository batchScheduleRepository;
     private final BatchService batchService;
     private final CacheManager cacheManager;
 
     @Scheduled(cron = "0 * * * * *") // 매 분마다 실행
     public void scheduledBatchExecution() {
-        List<BatchInfo> activeBatches = batchInfoRepository.findByUseYn(true);
-        LocalDateTime now = LocalDateTime.now();
+        List<BatchSchedule> schedules = batchScheduleRepository.findByEnabled(true);
 
-        for (BatchInfo batch : activeBatches) {
-            if (batch.getCronExpression() != null && !batch.getCronExpression().isEmpty()) {
-                try {
-                    CronExpression cron = CronExpression.parse(batch.getCronExpression());
-                    LocalDateTime nextExecution = cron.next(
-                            batch.getLastExecutionTime() != null ? batch.getLastExecutionTime() : now.minusMinutes(1));
+        for (BatchSchedule schedule : schedules) {
+            BatchInfo batch = schedule.getBatchInfo();
+            if (batch == null || !batch.getUseYn()) {
+                continue;
+            }
 
-                    if (nextExecution != null && nextExecution.isBefore(now)) {
-                        log.info("스케줄 배치 실행: {}", batch.getBatchId());
-                        batchService.executeBatch(batch.getBatchId(), false);
-                    }
-                } catch (Exception e) {
-                    log.error("배치 스케줄 확인 실패: {}", batch.getBatchId(), e);
+            if (schedule.getCronExpression() == null || schedule.getCronExpression().isEmpty()) {
+                continue;
+            }
+
+            try {
+                ZoneId zone = schedule.getTimezone() != null && !schedule.getTimezone().isEmpty()
+                        ? ZoneId.of(schedule.getTimezone())
+                        : ZoneId.systemDefault();
+
+                CronExpression cron = CronExpression.parse(schedule.getCronExpression());
+                ZonedDateTime baseTime = batch.getLastExecutionTime() != null
+                        ? batch.getLastExecutionTime().atZone(zone)
+                        : ZonedDateTime.now(zone).minusMinutes(1);
+                ZonedDateTime nextExecution = cron.next(baseTime);
+
+                if (nextExecution != null && nextExecution.isBefore(ZonedDateTime.now(zone))) {
+                    log.info("스케줄 배치 실행: {}", batch.getBatchId());
+                    batchService.executeBatch(batch.getBatchId(), false);
                 }
+            } catch (Exception e) {
+                log.error("배치 스케줄 확인 실패: {}", batch.getBatchId(), e);
             }
         }
     }

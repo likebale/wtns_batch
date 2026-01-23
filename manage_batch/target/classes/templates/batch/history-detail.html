@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Batch History Detail</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&family=Playfair+Display:wght@600&display=swap");
+
+      :root {
+        --ink: #141418;
+        --muted: #6b6f76;
+        --paper: #f7f2ea;
+        --accent: #ff6b35;
+        --line: #e5dcd1;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", sans-serif;
+        color: var(--ink);
+        background: radial-gradient(
+            1100px 700px at 20% -10%,
+            #ffe9d9,
+            transparent 60%
+          ),
+          radial-gradient(900px 600px at 90% 15%, #d8f4ef, transparent 55%),
+          var(--paper);
+        min-height: 100vh;
+      }
+
+      header {
+        padding: 32px 24px 16px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-family: "Playfair Display", serif;
+        font-size: 34px;
+      }
+
+      .subtitle {
+        color: var(--muted);
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 24px 48px;
+        animation: fade-in 360ms ease-out;
+      }
+
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .panel {
+        background: #fffdf9;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(20, 20, 24, 0.08);
+      }
+
+      .panel + .panel {
+        margin-top: 20px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .panel-header h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .pill {
+        border: none;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: white;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        width: 140px;
+      }
+
+      .mono {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: #1c1f24;
+        color: #fff;
+        font-size: 12px;
+      }
+
+      .tag.failed {
+        background: #c0392b;
+      }
+
+      .tag.running {
+        background: #f39c12;
+      }
+
+      .notice {
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>History Detail</h1>
+      <div class="subtitle">실행 이력과 재시도 상세 정보를 확인합니다.</div>
+    </header>
+    <main>
+      <section class="panel">
+        <div class="panel-header">
+          <h2>실행 정보</h2>
+          <a class="pill" href="/batch/history">Back</a>
+        </div>
+        <table>
+          <tbody>
+            <tr>
+              <th>ID</th>
+              <td class="mono" th:text="${history.id}">1</td>
+            </tr>
+            <tr>
+              <th>Batch ID</th>
+              <td class="mono" th:text="${history.batchId}">batch</td>
+            </tr>
+            <tr>
+              <th>Type</th>
+              <td th:text="${history.executionType}">MANUAL</td>
+            </tr>
+            <tr>
+              <th>Status</th>
+              <td>
+                <span
+                  class="tag"
+                  th:classappend="${history.status.name() == 'FAILED'} ? ' failed' : (${history.status.name() == 'RUNNING'} ? ' running' : '')"
+                  th:text="${history.status}"
+                  >SUCCESS</span
+                >
+              </td>
+            </tr>
+            <tr>
+              <th>Start</th>
+              <td th:text="${history.startTime}">-</td>
+            </tr>
+            <tr>
+              <th>End</th>
+              <td th:text="${history.endTime}">-</td>
+            </tr>
+            <tr>
+              <th>Error</th>
+              <td th:text="${history.errorMessage}">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>재시도 이력</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Seq</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr th:each="retry : ${history.retryHistories}">
+              <td class="mono" th:text="${retry.retrySequence}">1</td>
+              <td th:text="${retry.retryTime}">-</td>
+              <td>
+                <span
+                  class="tag"
+                  th:classappend="${retry.status.name() == 'FAILED'} ? ' failed' : ''"
+                  th:text="${retry.status}"
+                  >SUCCESS</span
+                >
+              </td>
+              <td th:text="${retry.errorMessage}">-</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(history.retryHistories)}">
+              <td colspan="4" class="notice">재시도 이력이 없습니다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
