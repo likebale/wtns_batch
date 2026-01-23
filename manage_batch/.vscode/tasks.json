@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "maven-compile",
+            "type": "shell",
+            "command": "mvn",
+            "args": [
+                "-q",
+                "-DskipTests",
+                "compile"
+            ],
+            "group": "build",
+            "problemMatcher": [
+                "$javac"
+            ]
+        }
+    ]
+}
