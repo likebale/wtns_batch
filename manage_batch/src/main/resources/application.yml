@@ -39,5 +39,5 @@ server:
   port: 8080
 
 batch:
-  lib-path: manage_batch/batch-libs
+  lib-path: batch-libs
   scan-on-startup: true
